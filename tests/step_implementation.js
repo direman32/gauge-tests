@@ -1,90 +1,23 @@
 /* globals gauge*/
 "use strict";
 const path = require('path');
-const {
-    openBrowser,
-    write,
-    closeBrowser,
-    goto,
-    press,
-    screenshot,
-    above,
-    click,
-    checkBox,
-    listItem,
-    toLeftOf,
-    link,
-    text,
-    into,
-    textBox,
-    evaluate
-} = require('taiko');
-const assert = require("assert");
-const headless = process.env.headless_chrome.toLowerCase() === 'true';
 
-beforeSuite(async () => {
-    await openBrowser({
-        headless: headless
-    })
-});
+const chai = require('chai');
+const chaiHttp = require('chai-http');
+chai.use(chaiHttp);
+const expect = chai.expect;
 
-afterSuite(async () => {
-    await closeBrowser();
-});
-
-// Return a screenshot file name
-gauge.customScreenshotWriter = async function () {
-    const screenshotFilePath = path.join(process.env['gauge_screenshots_dir'],
-        `screenshot-${process.hrtime.bigint()}.png`);
-
-    await screenshot({
-        path: screenshotFilePath
-    });
-    return path.basename(screenshotFilePath);
-};
-
-step("Add task <item>", async (item) => {
-    await write(item, into(textBox("What needs to be done?")));
-    await press('Enter');
-});
-
-step("View <type> tasks", async function (type) {
-    await click(link(type));
-});
-
-step("Complete tasks <table>", async function (table) {
-    for (var row of table.rows) {
-        await click(checkBox(toLeftOf(row.cells[0])));
-    }
-});
-
-step("Clear all tasks", async function () {
-    await evaluate(() => localStorage.clear());
-});
-
-step("Open todo application", async function () {
-    await goto("todo.taiko.dev");
-});
-
-step("Must not have <table>", async function (table) {
-    for (var row of table.rows) {
-        assert.ok(!await text(row.cells[0]).exists(0, 0));
-    }
-});
-
-step("Must display <message>", async function (message) {
-    assert.ok(await text(message).exists(0, 0));
-});
-
-step("Add tasks <table>", async function (table) {
-    for (var row of table.rows) {
-        await write(row.cells[0]);
-        await press('Enter');
-    }
-});
-
-step("Must have <table>", async function (table) {
-    for (var row of table.rows) {
-        assert.ok(await text(row.cells[0]).exists());
-    }
+step("hit account endpoint and validate response", async () => {
+    return chai.request(`${process.env.REST_API_URL}`).get(`/customers`)
+    .send(iban)
+        .then(function (response) {
+            let body = response.body[0];
+            expect(response).to.have.status(200);
+            expect(body).to.have.property('reference').to.be.a('number');
+            expect(body).to.have.property('summaryURL').to.be.a('string');
+            expect(body).to.have.property('bondsURL').to.be.a('string');
+            expect(body).to.have.property('prizesURL').to.be.a('string');
+            expect(body).to.have.property('transactionsURL').to.be.a('string');
+            expect(body).to.have.property('accountType').to.be.a('string').that.is.oneOf(['SOLE','JOINT']);
+        });
 });
